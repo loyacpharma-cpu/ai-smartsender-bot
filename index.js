@@ -19,7 +19,7 @@ app.post("/gpt", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-5.4-mini",
+        model: "gpt-4.1",
         input: `Відповідай українською. Питання: ${userMessage}`
       })
     });
