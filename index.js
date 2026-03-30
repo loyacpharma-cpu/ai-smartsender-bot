@@ -6,22 +6,16 @@ app.use(express.json());
 
 function extractText(data) {
   try {
-    if (!data || !Array.isArray(data.output)) return "";
+    const parts = data?.output?.[0]?.content;
+    if (!Array.isArray(parts)) return "";
 
-    const texts = [];
-
-    for (const item of data.output) {
-      if (item.type === "message" && Array.isArray(item.content)) {
-        for (const part of item.content) {
-          if (part.type === "output_text" && part.text) {
-            texts.push(part.text);
-          }
-        }
-      }
-    }
+    const texts = parts
+      .filter((item) => item.type === "output_text" || item.text)
+      .map((item) => item.text || "")
+      .filter(Boolean);
 
     return texts.join("\n").trim();
-  } catch {
+  } catch (e) {
     return "";
   }
 }
@@ -31,7 +25,9 @@ app.post("/gpt", async (req, res) => {
     const userMessage = req.body.message || "";
 
     if (!userMessage.trim()) {
-      return res.json({ answer: "Будь ласка, напиши питання." });
+      return res.json({
+        answer: "Будь ласка, напиши питання."
+      });
     }
 
     const prompt = `
@@ -42,36 +38,42 @@ app.post("/gpt", async (req, res) => {
 ${userMessage}
 `;
 
- const response = await fetch("https://api.openai.com/v1/responses", {
-  method: "POST",
-  headers: {
-    "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    model: "gpt-5.4-mini",
-    input: prompt
-  })
-});
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-5.4-mini",
+        input: prompt
+      })
+    });
 
-const data = await response.json();
+    const data = await response.json();
 
-console.log("OPENAI STATUS:", response.status);
-console.log("OPENAI DATA:", JSON.stringify(data, null, 2));
+    console.log("OPENAI STATUS:", response.status);
+    console.log("OPENAI DATA:", JSON.stringify(data, null, 2));
 
-if (!response.ok) {
-  return res.json({
-    answer: `OpenAI error ${response.status}: ${data?.error?.message || "невідома помилка"}`
-  });
-}
+    if (!response.ok) {
+      return res.status(500).json({
+        answer: `OpenAI error ${response.status}: ${data?.error?.message || "невідома помилка"}`
+      });
+    }
 
-const answer = extractText(data) || "Немає відповіді";
-res.json({ answer });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ answer: "Сталася помилка на сервері." });
+    const answer = extractText(data) || "Немає відповіді";
+
+    return res.json({ answer });
+  } catch (error) {
+    console.error("SERVER ERROR:", error);
+
+    return res.status(500).json({
+      answer: "Сталася помилка на сервері."
+    });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`Server started on port ${PORT}`);
+});
