@@ -42,22 +42,31 @@ app.post("/gpt", async (req, res) => {
 ${userMessage}
 `;
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-5.4-mini",
-        input: prompt
-      })
-    });
+ const response = await fetch("https://api.openai.com/v1/responses", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "gpt-5.4-mini",
+    input: prompt
+  })
+});
 
-    const data = await response.json();
-    const answer = extractText(data) || "Немає відповіді";
+const data = await response.json();
 
-    res.json({ answer });
+console.log("OPENAI STATUS:", response.status);
+console.log("OPENAI DATA:", JSON.stringify(data, null, 2));
+
+if (!response.ok) {
+  return res.json({
+    answer: `OpenAI error ${response.status}: ${data?.error?.message || "невідома помилка"}`
+  });
+}
+
+const answer = extractText(data) || "Немає відповіді";
+res.json({ answer });
   } catch (e) {
     console.error(e);
     res.status(500).json({ answer: "Сталася помилка на сервері." });
