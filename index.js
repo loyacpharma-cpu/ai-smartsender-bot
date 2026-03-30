@@ -4,12 +4,38 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
+function extractText(data) {
+  try {
+    if (!data || !Array.isArray(data.output)) return "";
+
+    const texts = [];
+
+    for (const item of data.output) {
+      if (item.type === "message" && Array.isArray(item.content)) {
+        for (const part of item.content) {
+          if (part.type === "output_text" && part.text) {
+            texts.push(part.text);
+          }
+        }
+      }
+    }
+
+    return texts.join("\n").trim();
+  } catch {
+    return "";
+  }
+}
+
 app.post("/gpt", async (req, res) => {
   try {
     const userMessage = req.body.message || "";
 
+    if (!userMessage.trim()) {
+      return res.json({ answer: "Будь ласка, напиши питання." });
+    }
+
     const prompt = `
-Ти — AI-асистент для онбордингу медичних представників.
+Ти — AI-асистент для онбордингу нових медичних представників.
 Відповідай українською, просто і структуровано.
 
 Питання:
@@ -23,20 +49,20 @@ ${userMessage}
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-5.3",
+        model: "gpt-5.4-mini",
         input: prompt
       })
     });
 
     const data = await response.json();
+    const answer = extractText(data) || "Немає відповіді";
 
-    res.json({
-      answer: data.output_text || "Немає відповіді"
-    });
-
+    res.json({ answer });
   } catch (e) {
-    res.json({ answer: "Помилка 😢" });
+    console.error(e);
+    res.status(500).json({ answer: "Сталася помилка на сервері." });
   }
 });
 
-app.listen(3000, () => console.log("Server started"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
